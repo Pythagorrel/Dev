@@ -1,4 +1,6 @@
-g = 0; h = 0; i = 0; j = 0; k = 0 #initialising indices for while loops 
+global g = 0; h = 0; i = 0; j = 0; k = 0 #initialising indices for while loops 
+
+global CS_monthly = 0; global TE_monthly; global DF_monthly; global PSC_monthly; global DEP_monthly;
 
 println("Please enter the number of work days in the current month.")
 
@@ -19,7 +21,7 @@ function csv1()
 println("If these expenses belong to different accounts, enter 1.\nIf not, enter 2.")
 
 c1 = parse(float64, readline()) #MENU SECTION; REWRITE WITH STRUCT >: ABSTRACT_TYPE & HELPER FUNCTIONS FOR MULTIPLE DEPLOY
-    if d1 == 1 
+    if c1 == 1 
         println("Please select the type of expense from the menu by entering its corresponding number:
         \n 1. Doctor Fees 
         \n 2. Pharmacy Supplies")
