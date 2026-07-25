@@ -1,12 +1,11 @@
-global g = 0; h = 0; i = 0; j = 0; k = 0 #initialising indices for while loops 
-
-global CS_monthly = 0; global TE_monthly; global DF_monthly; global PSC_monthly; global DEP_monthly;
+# g = 0; h = 0; i = 0; j = 0; k = 0 #initialising indices for while loops 
 
 println("Please enter the number of work days in the current month.")
 
 n = parse(Int,readline())
 
-function csv1()
+function csv1(n)
+    g=0; CS_monthly = 0; TE_monthly = 0; DF_monthly = 0; PSC_monthly = 0; DEP_monthly = 0 
     while g < n 
  day_no = g+1
 
@@ -75,5 +74,5 @@ end
 return CS_monthly, TE_monthly, DF_monthly, PSC_monthly, DEP_monthly
 end
 
-csv1()
+csv1(n)
 
