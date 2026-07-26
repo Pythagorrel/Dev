@@ -103,6 +103,7 @@ function csv1(n)
                         println("Proceeding to next section. Please Press Enter...")
                         readline()
                         pending_1 = false
+                        pending = false
                     elseif c3 == "2"
                         println("Returning to menu...\n")
                     else
