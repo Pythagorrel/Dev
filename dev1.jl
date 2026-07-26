@@ -201,3 +201,51 @@ function write_ledger_csv(monthly_costs::costs, monthly_total::totals, filepath:
     CSV.write(filepath, df)
     return df
 end
+
+# Example usage, once csv1() has produced its outputs:
+# monthly_costs, monthly_total, daily_values = csv1(n_work_days)
+# df_1 = write_ledger_csv(monthly_costs, monthly_total, "ledger.csv")
+
+#---------------------------------------Daily Records CSV Generation--------------------------------------------------
+#= Builds one row per day from the daily_values dict and date vector output by csv1().
+   Total Daily Expenses is a derived column (Doctor's Fees + Pharmacy Supply Costs for
+   that day) — not stored in daily_values itself, just computed here. This is not
+   problematic to add at this stage since it's calculated fresh each time from values
+   that already exist; nothing needs to change in csv1() for this to work.
+
+   NOTE: this assumes at most one entry per category per day (see explanation above
+   re: overwrite behavior in csv1). If the same category can occur more than once on
+   the same day and you need that preserved as separate rows, csv1 needs to log
+   individual entries rather than overwrite a single day-indexed value — let me know
+   if you want that added. =#
+function build_daily_records(daily_values::Dict{String,Vector{Float64}}, date::Vector{Int})
+    n = length(date)
+
+    doctor_fees   = daily_values["Doctor's Fees"]
+    pharmacy      = daily_values["Pharmacy Supplies"]
+    cash_received = daily_values["Cash Received"]
+    deposits      = daily_values["Deposits"]
+
+    total_daily_expenses = [doctor_fees[i] + pharmacy[i] for i in 1:n]  # GENERATED: derived column, not stored elsewhere
+
+    df = DataFrame(
+        Symbol("Date")                     => date,
+        Symbol("Cash Sales (Received)")    => cash_received,
+        Symbol("Doctor's Fees")            => doctor_fees,
+        Symbol("Pharmacy Supply Costs")    => pharmacy,
+        Symbol("Total Daily Expenses")     => total_daily_expenses,
+        Symbol("Deposits")                 => deposits
+    )
+
+    return df
+end
+
+function write_daily_records_csv(daily_values::Dict{String,Vector{Float64}}, date::Vector{Int}, filepath::String)
+    df = build_daily_records(daily_values, date)
+    CSV.write(filepath, df)
+    return df
+end
+
+# Example usage, once csv1() has produced its outputs:
+# monthly_costs, monthly_total, daily_values, date = csv1(n_work_days)
+# df_2 = write_daily_records_csv(daily_values, date, "daily_records.csv")
