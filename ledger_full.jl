@@ -94,6 +94,20 @@ function csv1(n)
                 daily_values["Doctor's Fees"][day_no] = parse(Float64,readline())
                 monthly_costs.doctor_fees += daily_values["Doctor's Fees"][day_no]
 
+                println("Is this the only type of expense for this day? Enter 1 or 2:
+                \n1. Yes, proceed to next section.
+                \n2. No, there are other expenses.")
+
+                c3 = readline() #choice 3 on whether there was 1 or multiple expenses for the day
+                    if c3 == "1"
+                        println("Proceeding to next section. Please Press Enter...")
+                        readline()
+                        pending_1 = false
+                    elseif c3 == "2"
+                        println("Returning to menu...\n")
+                    else
+                        println("Invalid input, returning to menu.")
+
             elseif c2 == "2" #Pharmacy Supplies
 
                 println("You selected Pharmacy Supplies.
@@ -101,28 +115,28 @@ function csv1(n)
                 daily_values["Pharmacy Supplies"][day_no] = parse(Float64,readline())
                 monthly_costs.pharmacy_supply_costs += daily_values["Pharmacy Supplies"][day_no]
 
+                println("Is this the only type of expense for this day? Enter 1 or 2:
+                \n1. Yes, proceed to next section.
+                \n2. No, there are other expenses.")
+
+                c3 = readline() #choice 3 on whether there was 1 or multiple expenses for the day
+                    if c3 == "1"
+                        println("Proceeding to next section. Please Press Enter...")
+                        readline()
+                        pending_1 = false
+                        pending = false
+                    elseif c3 == "2"
+                        println("Returning to menu...\n")
+                    else
+                        println("Invalid input, returning to menu.")
+
             else #invalid input
                 println("Invalid choice, please try again.")
             end
-
-        println("Is this the only type of expense for this day? Enter 1 or 2:
-        \n1. Yes, proceed to next section.
-        \n2. No, there are other expenses.")
-
-        c3 = readline() #choice 3 on whether there was 1 or multiple expenses for the day
-        if c3 == "1"
-        println("Proceeding to next section. Please Press Enter...")
-        readline()
-        pending_1 = false
-        elseif c3 == "2"
-        println("Returning to menu...\n")
-        else
-        println("Invalid input, returning to menu.")
-
         end
     end
         else
-            println("You are about to proceed to the next section.\nPress 1 to confirm or any other key to return to the previous section.")
+           println("You are about to proceed to the next section.\nPress 1 to confirm or any other key to return to the previous section.")
            c4 = readline() #confirmation on choice
            if c4=="1"
             monthly_total.expenses += daily_values["Doctor's Fees"][day_no] + daily_values["Pharmacy Supplies"][day_no]
