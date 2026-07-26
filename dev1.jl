@@ -1,3 +1,5 @@
+using DataFrames, CSV
+
 abstract type ledger_fields end 
 
 mutable struct totals <: ledger_fields
@@ -30,6 +32,8 @@ end
     println("Please enter the number of work days for $(m)/$(y).")  # FIXED: was $(month)/$(year), but those names don't exist at this scope — m,y are what get_date() returned
     n_work_days = parse(Float64, readline())  # FIXED: was `readline` (missing parens)
 
+#--------------------------------------------Monthly total calculation section--------------------------------------------
+
 function csv1(n)
     daily_values = Dict{String,Vector{Float64}}(
         "Doctor's Fees" => Float64[],
@@ -39,7 +43,9 @@ function csv1(n)
     )
     monthly_total = totals()
     monthly_costs = costs() #sum of each individual type of cost per month
-    g=0; 
+    g=0
+    
+    date =[]
 
     while g < n
 
@@ -52,6 +58,9 @@ function csv1(n)
          # NOTE: kept as a single push! per category per day (one 0.0 placeholder), as intended for
          # keeping all four vectors the same length for Tables.jl. The bug was downstream, where the
          # real value used to get push!'d again on top instead of overwriting this placeholder.
+
+        println("Please enter the date [number from 1-31] of this balance sheet.")
+        date[day_no] = parse(Int,readline())
 
         println("Please enter the Cash Sales (Received) for day $(day_no).")
 
@@ -131,15 +140,15 @@ function csv1(n)
 
         g += 1  # OMISSION FIXED: original loop never incremented g, so `while g < n` would never terminate (infinite loop, and day_no would stay stuck at 1 forever)
 end
-return monthly_costs, monthly_total, daily_values
+return monthly_costs, monthly_total, daily_values, date
 end
-#------------------------Quickbooks Balance Sheet Generation Section-------------------------------------
-using DataFrames, CSV
 
-# Maps each field of the `costs` struct to its corresponding QuickBooks account name.
-# When a new cost category is added to the `costs` struct later, add its mapping here
-# too — that's the only edit required. Only Account, Debit, and Credit are produced
-# by this code; Description, Name, Tax, and Location are not handled here.
+#------------------------Quickbooks Balance Sheet Generation Section--------------------------------------------------
+
+#= Maps each field of the `costs` struct to its corresponding QuickBooks account name.
+# When a new cost category is added to the `costs` struct later, add its mapping here too; that's the only edit required. 
+Only Account, Debit, and Credit are produced by this code; Description, Name, Tax, and Location are not handled here.=#
+
 const COST_ACCOUNT_INFO = Dict(
     :doctor_fees           => "Cost of sales:Sub-contractor - COS",
     :pharmacy_supply_costs => "Medical & Lab Tests"
@@ -149,8 +158,9 @@ const CASH_ACCOUNT        = "Cash & Cash Equivalent:Petty Cash:Petty Cash Urgent
 const SALES_ACCOUNT       = "Medical & Lab Tests"
 const UNDEPOSITED_ACCOUNT = "Undeposited Funds"
 
-# Builds the ledger rows, in order, from the monthly_costs and monthly_total structs
-# output by csv1(). Only Account, Debit, and Credit columns are produced, per scope.
+#= Builds the ledger rows, in order, from the monthly_costs and monthly_total structs
+   output by csv1(). Only Account, Debit, and Credit columns are produced, per scope.=#
+
 function build_ledger_rows(monthly_costs::costs, monthly_total::totals)
     rows = NamedTuple[]
 
@@ -168,7 +178,7 @@ function build_ledger_rows(monthly_costs::costs, monthly_total::totals)
         if amount > 0.0   # entry omitted entirely if this category's monthly total is 0
             account = get(COST_ACCOUNT_INFO, field, nothing)
             if account === nothing
-                error("No account mapping defined for cost field :$field — add it to COST_ACCOUNT_INFO")
+                error("No account mapping defined for cost field :$field [add cost account to COST_ACCOUNT_INFO]")
             end
             push!(rows, (Account=account, Debit=amount, Credit=missing))
             push!(rows, (Account=CASH_ACCOUNT, Debit=missing, Credit=amount))
