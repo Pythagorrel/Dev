@@ -1,4 +1,3 @@
-# g = 0; h = 0; i = 0; j = 0; k = 0 #initialising indices for while loops 
 abstract type ledger_fields end 
 
 mutable struct totals <: ledger_fields
@@ -133,4 +132,62 @@ function csv1(n)
         g += 1  # OMISSION FIXED: original loop never incremented g, so `while g < n` would never terminate (infinite loop, and day_no would stay stuck at 1 forever)
 end
 return monthly_costs, monthly_total, daily_values
+end
+#------------------------Quickbooks Balance Sheet Generation Section-------------------------------------
+using DataFrames, CSV
+
+# Maps each field of the `costs` struct to its corresponding QuickBooks account name.
+# When a new cost category is added to the `costs` struct later, add its mapping here
+# too — that's the only edit required. Only Account, Debit, and Credit are produced
+# by this code; Description, Name, Tax, and Location are not handled here.
+const COST_ACCOUNT_INFO = Dict(
+    :doctor_fees           => "Cost of sales:Sub-contractor - COS",
+    :pharmacy_supply_costs => "Medical & Lab Tests"
+)
+
+const CASH_ACCOUNT        = "Cash & Cash Equivalent:Petty Cash:Petty Cash Urgent Care"
+const SALES_ACCOUNT       = "Medical & Lab Tests"
+const UNDEPOSITED_ACCOUNT = "Undeposited Funds"
+
+# Builds the ledger rows, in order, from the monthly_costs and monthly_total structs
+# output by csv1(). Only Account, Debit, and Credit columns are produced, per scope.
+function build_ledger_rows(monthly_costs::costs, monthly_total::totals)
+    rows = NamedTuple[]
+
+    # 1. Cash sales entry (skipped if there were no cash sales this month)
+    if monthly_total.cash_sales > 0.0
+        push!(rows, (Account=CASH_ACCOUNT, Debit=monthly_total.cash_sales, Credit=missing))
+        push!(rows, (Account=SALES_ACCOUNT, Debit=missing, Credit=monthly_total.cash_sales))
+    end
+
+    # 2. One debit/credit pair per cost category — iterates over every field of the
+    #    `costs` struct generically, so adding new categories later needs no changes
+    #    here, only a new entry in COST_ACCOUNT_INFO above.
+    for field in fieldnames(costs)
+        amount = getfield(monthly_costs, field)
+        if amount > 0.0   # entry omitted entirely if this category's monthly total is 0
+            account = get(COST_ACCOUNT_INFO, field, nothing)
+            if account === nothing
+                error("No account mapping defined for cost field :$field — add it to COST_ACCOUNT_INFO")
+            end
+            push!(rows, (Account=account, Debit=amount, Credit=missing))
+            push!(rows, (Account=CASH_ACCOUNT, Debit=missing, Credit=amount))
+        end
+    end
+
+    # 3. Deposits entry (skipped if there were no deposits this month)
+    if monthly_total.deposits > 0.0
+        push!(rows, (Account=UNDEPOSITED_ACCOUNT, Debit=monthly_total.deposits, Credit=missing))
+        push!(rows, (Account=CASH_ACCOUNT, Debit=missing, Credit=monthly_total.deposits))
+    end
+
+    return rows
+end
+
+# Converts the ledger rows into a DataFrame (preserving row order) and writes the CSV.
+function write_ledger_csv(monthly_costs::costs, monthly_total::totals, filepath::String)
+    rows = build_ledger_rows(monthly_costs, monthly_total)
+    df = DataFrame(rows)
+    CSV.write(filepath, df)
+    return df
 end
