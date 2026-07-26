@@ -23,20 +23,21 @@ function get_date()
      println("Please enter the year corresponding to the current balance sheet.")
      year = readline()
      println("Please enter the number (1-12) of the month corresponding to the current balance sheet.")
-     month = readline
+     month = readline()  # FIXED: was `readline` (missing parens) — assigned the function itself instead of calling it
      return month, year
 end
     m,y = get_date()
 
-    println("Please enter the number of work days for $(month)/$(year).")
-    n_work_days = parse(Float64, readline)
+    println("Please enter the number of work days for $(m)/$(y).")  # FIXED: was $(month)/$(year), but those names don't exist at this scope — m,y are what get_date() returned
+    n_work_days = parse(Float64, readline())  # FIXED: was `readline` (missing parens)
 
 function csv1(n)
     daily_values = Dict{String,Vector{Float64}}(
-        "Doctor's Fees" => Float64[], 
-        "Pharmacy Supplies" => Float64[])
-        "Cash Received" => Float64[], 
+        "Doctor's Fees" => Float64[],
+        "Pharmacy Supplies" => Float64[],   # FIXED: original closed the Dict(...) here with `)`, orphaning the next two pairs — syntax error
+        "Cash Received" => Float64[],
         "Deposits" => Float64[]
+    )
     monthly_total = totals()
     monthly_costs = costs() #sum of each individual type of cost per month
     g=0; 
@@ -49,10 +50,13 @@ function csv1(n)
          push!(daily_values["Doctor's Fees"],0.0)
          push!(daily_values["Pharmacy Supplies"],0.0)
          push!(daily_values["Deposits"],0.0)
+         # NOTE: kept as a single push! per category per day (one 0.0 placeholder), as intended for
+         # keeping all four vectors the same length for Tables.jl. The bug was downstream, where the
+         # real value used to get push!'d again on top instead of overwriting this placeholder.
 
         println("Please enter the Cash Sales (Received) for day $(day_no).")
 
-        push!(daily_values["Cash Received"],parse(Float64,readline())) 
+        daily_values["Cash Received"][day_no] = parse(Float64,readline())  # FIXED: was push!(...) — this added a second entry instead of overwriting the day's placeholder, shifting every later index out of alignment
         monthly_total.cash_sales += daily_values["Cash Received"][day_no] #rolling total for total monthly cash sales
 
         pending = true
@@ -78,14 +82,14 @@ function csv1(n)
                 
                 println("You selected Doctor's Fees.
                 \nPlease enter the total for the day.")
-                push!(daily_values["Doctor's Fees"],parse(Float64,readline())) 
+                daily_values["Doctor's Fees"][day_no] = parse(Float64,readline())  # FIXED: was push!(...) — same overwrite-not-append fix as Cash Received above
                 monthly_costs.doctor_fees += daily_values["Doctor's Fees"][day_no]
 
             elseif c2 == "2" #Pharmacy Supplies
 
                 println("You selected Pharmacy Supplies.
                 \nPlease enter the total for the day.")
-                push!(daily_values["Pharmacy Supplies"],parse(Float64,readline())) 
+                daily_values["Pharmacy Supplies"][day_no] = parse(Float64,readline())  # FIXED: was push!(...) — same overwrite-not-append fix
                 monthly_costs.pharmacy_supply_costs += daily_values["Pharmacy Supplies"][day_no]
 
             else #invalid input
@@ -112,17 +116,21 @@ function csv1(n)
             println("You are about to proceed to the next section.\nPress 1 to confirm or any other key to return to the previous section.")
            c4 = readline() #confirmation on choice
            if c4=="1"
-            monthly_total.expenses += sum(sum(v) for v in values(daily_values))
-            monthly_costs.doctor_fees += sum(daily_values["Doctor's Fees"])
-            monthly_costs.pharmacy_supply_costs += sum(daily_values["Pharmacy Supplies"])
+            # FIXED: removed `monthly_total.expenses += sum(sum(v) for v in values(daily_values))` —
+            # this summed ALL four categories including Cash Received and Deposits, which aren't expenses.
+            # FIXED: removed `monthly_costs.doctor_fees += sum(daily_values["Doctor's Fees"])` and the
+            # matching pharmacy_supply_costs line — these re-added the running totals a second time on
+            # top of the incremental `+=` already done inside the c2=="1"/"2" branches above, double-counting.
+            monthly_total.expenses += daily_values["Doctor's Fees"][day_no] + daily_values["Pharmacy Supplies"][day_no]  # GENERATED: replacement line — sums only this day's two expense categories into the day's total expenses
             pending = false
            end
         end
         end
         println("Please enter the total deposits for the day.")
-        push!(daily_values["Deposits"],parse(Float64,readline()))
+        daily_values["Deposits"][day_no] = parse(Float64,readline())  # FIXED: was push!(...) — same overwrite-not-append fix
         monthly_total.deposits += daily_values["Deposits"][day_no]
+
+        g += 1  # OMISSION FIXED: original loop never incremented g, so `while g < n` would never terminate (infinite loop, and day_no would stay stuck at 1 forever)
 end
 return monthly_costs, monthly_total, daily_values
 end
-
