@@ -112,13 +112,17 @@ function csv1(n)
             println("You are about to proceed to the next section.\nPress 1 to confirm or any other key to return to the previous section.")
            c4 = readline() #confirmation on choice
            if c4=="1"
+            monthly_total.expenses += sum(sum(v) for v in values(daily_values))
+            monthly_costs.doctor_fees += sum(daily_values["Doctor's Fees"])
+            monthly_costs.pharmacy_supply_costs += sum(daily_values["Pharmacy Supplies"])
             pending = false
            end
         end
         end
         println("Please enter the total deposits for the day.")
         push!(daily_values["Deposits"],parse(Float64,readline()))
-        monthly_total.deposits
+        monthly_total.deposits += daily_values["Deposits"][day_no]
 end
+return monthly_costs, monthly_total, daily_values
 end
 
