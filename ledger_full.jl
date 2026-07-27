@@ -99,15 +99,16 @@ function csv1(n)
                 \n2. No, there are other expenses.")
 
                 c3 = readline() #choice 3 on whether there was 1 or multiple expenses for the day
-                    if c3 == "1"
-                        println("Proceeding to next section. Please Press Enter...")
-                        readline()
-                        pending_1 = false
-                        pending = false
-                    elseif c3 == "2"
-                        println("Returning to menu...\n")
-                    else
-                        println("Invalid input, returning to menu.")
+                if c3 == "1"
+                    println("Proceeding to next section. Please Press Enter...")
+                    readline()
+                    pending_1 = false
+                    pending = false
+                elseif c3 == "2"
+                    println("Returning to menu...\n")
+                else
+                    println("Invalid input, returning to menu.")
+                end  # FIXED: missing end for this inner if c3==... block
 
             elseif c2 == "2" #Pharmacy Supplies
 
@@ -121,30 +122,36 @@ function csv1(n)
                 \n2. No, there are other expenses.")
 
                 c3 = readline() #choice 3 on whether there was 1 or multiple expenses for the day
-                    if c3 == "1"
-                        println("Proceeding to next section. Please Press Enter...")
-                        readline()
-                        pending_1 = false
-                        pending = false
-                    elseif c3 == "2"
-                        println("Returning to menu...\n")
-                    else
-                        println("Invalid input, returning to menu.")
+                if c3 == "1"
+                    println("Proceeding to next section. Please Press Enter...")
+                    readline()
+                    pending_1 = false
+                    pending = false
+                elseif c3 == "2"
+                    println("Returning to menu...\n")
+                else
+                    println("Invalid input, returning to menu.")
+                end  # FIXED: missing end for this inner if c3==... block
 
             else #invalid input
                 println("Invalid choice, please try again.")
-            end
-        end
-    end
+            end  # closes if c2 == "1" / elseif "2" / else
+        end  # closes while pending_1
         else
            println("You are about to proceed to the next section.\nPress 1 to confirm or any other key to return to the previous section.")
            c4 = readline() #confirmation on choice
            if c4=="1"
-            monthly_total.expenses += daily_values["Doctor's Fees"][day_no] + daily_values["Pharmacy Supplies"][day_no]
             pending = false
            end
         end
-        end
+        end  # closes while pending
+
+        # GENERATED: moved here from the old c4 branch — this now fires exactly once per day,
+        # after the expense-entry loop exits, regardless of whether the day had expenses (c1=="1")
+        # or not (c1=="2"). Previously this line only lived inside the c1=="2" branch, so days
+        # WITH real expenses never added anything to monthly_total.expenses at all.
+        monthly_total.expenses += daily_values["Doctor's Fees"][day_no] + daily_values["Pharmacy Supplies"][day_no]
+
         println("Please enter the total deposits for the day.")
         daily_values["Deposits"][day_no] = parse(Float64,readline())
         monthly_total.deposits += daily_values["Deposits"][day_no]
@@ -162,7 +169,7 @@ Only Account, Debit, and Credit are produced by this code; Description, Name, Ta
 
 const COST_ACCOUNT_INFO = Dict(
     :doctor_fees           => "Cost of sales:Sub-contractor - COS",
-    :pharmacy_supply_costs => "Medical & Lab Tests"
+    :pharmacy_supply_costs => "Cost of sales:Purchases-COS"  # FIXED: was "Medical & Lab Tests" — corrected per updated account mapping
 )
 
 const CASH_ACCOUNT        = "Cash & Cash Equivalent:Petty Cash:Petty Cash Urgent Care"
@@ -260,7 +267,7 @@ function log_entry(filepath::String="audit_log.txt")
 end
 
 #---------------------------------------Driver Code--------------------------------------------------
-#= calls the functions above in order, capturing every output, then
+#= GENERATED SECTION: calls the functions above in order, capturing every output, then
    writes both CSVs. Filenames are relative paths — they'll be written into whatever
    directory `pwd()` reports when this script is run. Change to full paths (e.g.
    "C:/Users/YourName/Documents/ledger.csv") if you want them written somewhere specific. =#
@@ -269,6 +276,6 @@ monthly_costs, monthly_total, daily_values, date = csv1(n_work_days)
 
 df_ledger = write_ledger_csv(monthly_costs, monthly_total, "ledger_$(m)_$(y).csv")
 df_daily  = write_daily_records_csv(daily_values, date, "daily_records_$(m)_$(y).csv")
-log_entry()  # records who ran this script and when, appended to audit_log.txt in pwd()
+log_entry()  # GENERATED: records who ran this script and when, appended to audit_log.txt in pwd()
 
 println("Done. Files written to: $(pwd())")
