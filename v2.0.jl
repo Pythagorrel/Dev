@@ -1,3 +1,5 @@
+using DataFrames, CSV, Dates
+
 cash_eq_in = [(key=:cash_sales, label="Cash Sales", account="Cash & Cash Equivalent:Petty Cash:Petty Cash Urgent Care"),
     (key=:POS_Scotia, label="POS Deposits To Scotiabank", account="Cash & Cash Equivalent:Scotia Bank"),
     (key=:POS_RBL, label="POS Deposits to Republic Bank", account="Cash & Cash Equivalent:RBL - CHQ-13739"),
@@ -12,6 +14,12 @@ expense = [(key=:doctor_fees, label="Doctor's Fees", account="Cost of sales:Sub-
 deposit = [(key=:deposits, label="Deposits", account="Undeposited Funds Urgent Care")]
 
 related_party = [(key=:Mr_Boyle, label="Transfers Out to Mr. Boyle", account="Related Party:Related Party-Mr.Boyle")]
+
+# NEW: the two "counter accounts" that don't live in any config array —
+# every cash_eq_in category credits this on sale, every expense/related_party credits this when paid out.
+const SALES_ACCOUNT = "Medical & Lab Tests"
+const CASH_ACCOUNT  = "Cash & Cash Equivalent:Petty Cash:Petty Cash Urgent Care"
+# NOTE: no separate UNDEPOSITED_ACCOUNT const needed — deposit[1].account already holds it.
 
 function get_date()
     year = "";
@@ -164,6 +172,135 @@ function csv1()
 
     total_rp = Dict(k=>sum(v) for (k, v) in daily_rp)
 
-    return dates, daily_cash_eq, total_cash_eq, daily_expense, total_expense, daily_deposit, total_deposit, daily_rp, total_rp
+    return dates, daily_cash_eq, total_cash_eq, daily_expense, total_expense, daily_deposit, total_deposit, daily_rp, total_rp, m, y
 
 end #csv1() end
+
+
+#------------------------QuickBooks Ledger Generation Section--------------------------------------------------
+# NEW: generic across all three category groups — each group's "counter account" differs,
+# so each gets its own loop rather than one shared pattern.
+
+function build_ledger_rows(total_cash_eq, total_expense, total_deposit, total_rp)
+    rows = NamedTuple[]
+
+    # NEW: merges categories within a group that share the same debit account, since only
+    # unique account names get their own ledger row. Scoped per-group (not across groups),
+    # so the shared counter-accounts (SALES_ACCOUNT, CASH_ACCOUNT) still get one row per
+    # group/section rather than one giant merged row across the whole ledger.
+    function merged_totals(categories, totals_dict)
+        combined = Dict{String,Float64}()
+        for c in categories
+            amt = totals_dict[c.key]
+            if amt > 0.0
+                combined[c.account] = get(combined, c.account, 0.0) + amt
+            end
+        end
+        return combined
+    end
+
+    # ---- Sales-crediting entries: debit each unique cash/POS account, credit medical sales revenue.
+    # Sorted largest-to-smallest.
+    cash_combined = merged_totals(cash_eq_in, total_cash_eq)
+    cash_entries = sort(collect(cash_combined), by = x -> x[2], rev = true)
+    for (account, amount) in cash_entries
+        push!(rows, (Account=account, Debit=amount, Credit=missing))
+        push!(rows, (Account=SALES_ACCOUNT, Debit=missing, Credit=amount))
+    end
+
+    # ---- Expense entries: debit each unique cost account (merged), credit petty cash.
+    expense_combined = merged_totals(expense, total_expense)
+    for c in expense
+        if haskey(expense_combined, c.account)  # NEW: skip if this account was already emitted by an earlier category sharing it
+            amount = expense_combined[c.account]
+            push!(rows, (Account=c.account, Debit=amount, Credit=missing))
+            push!(rows, (Account=CASH_ACCOUNT, Debit=missing, Credit=amount))
+            delete!(expense_combined, c.account)  # NEW: prevents re-emitting for the next category on the same account
+        end
+    end
+
+    # ---- Related party entries: debit each unique account (merged), credit petty cash.
+    rp_combined = merged_totals(related_party, total_rp)
+    for c in related_party
+        if haskey(rp_combined, c.account)
+            amount = rp_combined[c.account]
+            push!(rows, (Account=c.account, Debit=amount, Credit=missing))
+            push!(rows, (Account=CASH_ACCOUNT, Debit=missing, Credit=amount))
+            delete!(rp_combined, c.account)
+        end
+    end
+
+    # ---- Undeposited funds: always last, its own distinct pair — deliberately NOT merged
+    # into the CASH_ACCOUNT credits above, so it can stay the final entry as required.
+    total_deposits_amt = sum(values(total_deposit))
+    total_pos_amt = sum(total_cash_eq[c.key] for c in cash_eq_in if c.key != :cash_sales)
+    total_rp_amt = sum(values(total_rp))
+    undeposited_amt = total_deposits_amt - total_pos_amt - total_rp_amt
+
+    if undeposited_amt > 0.0
+        push!(rows, (Account=deposit[1].account, Debit=undeposited_amt, Credit=missing))
+        push!(rows, (Account=CASH_ACCOUNT, Debit=missing, Credit=undeposited_amt))
+    end
+
+    return rows
+end
+
+function write_ledger_csv(total_cash_eq, total_expense, total_deposit, total_rp, filepath::String)
+    rows = build_ledger_rows(total_cash_eq, total_expense, total_deposit, total_rp)
+    df = DataFrame(rows)
+    CSV.write(filepath, df)
+    return df
+end
+
+
+#---------------------------------------Daily Records CSV Generation--------------------------------------------------
+# NEW: one column per config-array category (was hardcoded to 2 categories before), plus a full
+# d-m-y Date column instead of just a day number, per client request.
+function build_daily_records(dates::Vector{Int}, m, y, daily_cash_eq, daily_expense, daily_deposit, daily_rp)
+    month_int = parse(Int, m)  # m/y come in as Strings from get_date(); Date() needs Ints
+    year_int  = parse(Int, y)
+    full_dates = [Date(year_int, month_int, d) for d in dates]  # NEW: full date, not just day number
+
+    cols = Any[Symbol("Date") => full_dates]
+    for category in cash_eq_in
+        push!(cols, Symbol(category.label) => daily_cash_eq[category.key])
+    end
+    for category in expense
+        push!(cols, Symbol(category.label) => daily_expense[category.key])
+    end
+    push!(cols, Symbol(deposit[1].label) => daily_deposit[deposit[1].key])
+    push!(cols, Symbol(related_party[1].label) => daily_rp[related_party[1].key])
+
+    return DataFrame(cols)
+end
+
+function write_daily_records_csv(dates, m, y, daily_cash_eq, daily_expense, daily_deposit, daily_rp, filepath::String)
+    df = build_daily_records(dates, m, y, daily_cash_eq, daily_expense, daily_deposit, daily_rp)
+    CSV.write(filepath, df)
+    return df
+end
+
+
+#---------------------------------------Audit Log--------------------------------------------------
+function log_entry(filepath::String="audit_log.txt")
+    username = get(ENV, "USERNAME", get(ENV, "USER", "unknown"))
+    timestamp = Dates.format(now(), "yyyy-mm-dd HH:MM:SS")
+    open(filepath, "a") do io
+        println(io, "$(timestamp) — $(username)")
+    end
+end
+
+
+#---------------------------------------Driver Code--------------------------------------------------
+dates, daily_cash_eq, total_cash_eq, daily_expense, total_expense, daily_deposit, total_deposit, daily_rp, total_rp, m, y = csv1()
+
+ledger_dir = "$(y)_ledgers"
+daily_dir  = "$(y)_daily_records"
+mkpath(ledger_dir)
+mkpath(daily_dir)
+
+df_ledger = write_ledger_csv(total_cash_eq, total_expense, total_deposit, total_rp, joinpath(ledger_dir, "ledger_$(m)_$(y).csv"))
+df_daily  = write_daily_records_csv(dates, m, y, daily_cash_eq, daily_expense, daily_deposit, daily_rp, joinpath(daily_dir, "daily_records_$(m)_$(y).csv"))
+log_entry()
+
+println("Done. Files written to: $(pwd())")
