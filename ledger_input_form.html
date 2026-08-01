@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ledger Input Grid</title>
+<style>
+  :root {
+    --ink: #1c2521;
+    --paper: #f7f5f0;
+    --line: #d8d2c4;
+    --accent: #1f6f5c;
+    --accent-soft: #e3efe9;
+    --danger: #a63d40;
+    --mono: "IBM Plex Mono", "Consolas", monospace;
+    --sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    padding: 32px 24px 80px;
+  }
+  h1 {
+    font-size: 22px;
+    letter-spacing: 0.02em;
+    margin: 0 0 4px;
+  }
+  .sub {
+    color: #5b6660;
+    font-size: 13.5px;
+    margin: 0 0 24px;
+    max-width: 640px;
+    line-height: 1.5;
+  }
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .toolbar label {
+    font-size: 12.5px;
+    color: #5b6660;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .toolbar input[type=number] {
+    width: 70px;
+    padding: 5px 6px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-family: var(--mono);
+  }
+  button {
+    font-family: var(--sans);
+    font-size: 13px;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+    padding: 8px 14px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  button.secondary {
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--line);
+  }
+  button.secondary:hover { border-color: var(--ink); }
+  button:hover { opacity: 0.9; }
+  .grid-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: white;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 12.5px;
+  }
+  th, td {
+    border-bottom: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    padding: 0;
+    white-space: nowrap;
+  }
+  th:last-child, td:last-child { border-right: none; }
+  thead th {
+    background: var(--accent-soft);
+    color: var(--ink);
+    font-weight: 600;
+    text-align: left;
+    padding: 8px 10px;
+    position: sticky;
+    top: 0;
+  }
+  thead tr.group th {
+    background: #cfe3da;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 5px 10px;
+  }
+  td input {
+    width: 84px;
+    border: none;
+    padding: 8px 10px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: transparent;
+  }
+  td input:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+  td.date-cell input { width: 56px; }
+  .rm-btn {
+    border: none;
+    background: none;
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 15px;
+    padding: 0 10px;
+  }
+  .footer-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+  }
+  .out {
+    margin-top: 20px;
+    display: none;
+  }
+  .out.show { display: block; }
+  .out textarea {
+    width: 100%;
+    height: 200px;
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: white;
+    resize: vertical;
+  }
+  .status {
+    font-size: 12.5px;
+    color: var(--accent);
+    margin-left: 10px;
+  }
+  .status.err { color: var(--danger); }
+  td input.invalid {
+    background: #fbe9e9;
+    outline: 2px solid var(--danger);
+    outline-offset: -2px;
+  }
+  .toolbar .divider {
+    width: 1px;
+    height: 22px;
+    background: var(--line);
+    margin: 0 4px;
+  }
+  .toolbar .bulk-add {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .error-list {
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: var(--danger);
+    background: #fbe9e9;
+    border: 1px solid var(--danger);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: none;
+  }
+  .error-list.show { display: block; }
+  .error-list ul { margin: 6px 0 0; padding-left: 18px; }
+</style>
+</head>
+<body>
+
+<h1>Ledger Input Grid</h1>
+<p class="sub">Fill in one row per day — leave a cell blank or 0 for anything not entered that day. "Generate" builds a plain-text file, in the exact prompt order the Julia program expects, ready to run as: <code>julia v2_1.jl &lt; input.txt</code></p>
+
+<div class="toolbar">
+  <label>Year <input type="number" id="year" value="2026"></label>
+  <label>Month <input type="number" id="month" value="9" min="1" max="12"></label>
+  <button class="secondary" id="addRow">+ Add day</button>
+  <span class="divider"></span>
+  <span class="bulk-add">
+    <label>Add <input type="number" id="bulkCount" value="5" min="1" max="60" style="width:50px;"> day(s)</label>
+    <button class="secondary" id="addBulk">Add</button>
+  </span>
+  <span class="divider"></span>
+  <button class="secondary" id="loadTest">Load Scenario G test data</button>
+  <span id="status" class="status"></span>
+</div>
+
+<div class="grid-wrap">
+  <table id="grid">
+    <thead>
+      <tr class="group">
+        <th></th>
+        <th colspan="4">Cash / Cash-equivalent received</th>
+        <th colspan="4">Expenses</th>
+        <th colspan="2">Other</th>
+        <th></th>
+      </tr>
+      <tr>
+        <th>Date</th>
+        <th>Cash Sales</th>
+        <th>POS→Scotia</th>
+        <th>POS→Republic</th>
+        <th>POS→Unspec.</th>
+        <th>Doctor's Fees</th>
+        <th>Med. Supplies</th>
+        <th>Misc.</th>
+        <th>Taxi Fare</th>
+        <th>Deposits</th>
+        <th>Related Party</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="gridBody"></tbody>
+  </table>
+</div>
+
+<div class="error-list" id="errorList">
+  <strong>Fix these before generating:</strong>
+  <ul id="errorItems"></ul>
+</div>
+
+<div class="footer-row">
+  <button id="generate">Generate &amp; download input file</button>
+</div>
+
+<div class="out" id="outWrap">
+  <p class="sub" style="margin-bottom:6px;">Preview (same content as the downloaded file):</p>
+  <textarea id="outText" readonly></textarea>
+</div>
+
+<script>
+// Category order MUST match cash_eq_in / expense arrays in v2.1.jl exactly —
+// menu index (1-based) is what gets written to the file, so order matters.
+const CASH_COLS = ["cash_sales", "pos_scotia", "pos_republic", "pos_unspec"];
+const EXP_COLS  = ["doctor_fees", "med_supplies", "misc", "taxi"];
+
+const gridBody = document.getElementById("gridBody");
+
+function addRow(values) {
+  const tr = document.createElement("tr");
+  const fields = ["date", ...CASH_COLS, ...EXP_COLS, "deposit", "related_party"];
+  fields.forEach((f) => {
+    const td = document.createElement("td");
+    if (f === "date") td.className = "date-cell";
+    const input = document.createElement("input");
+    input.type = "number";
+    input.step = "any";
+    input.dataset.field = f;
+    input.dataset.kind = (f === "date") ? "date" : "amount"; // NEW: used by validateField to pick the right rule
+    if (values && values[f] !== undefined) input.value = values[f];
+    input.addEventListener("blur", () => validateField(input)); // NEW: live validation as soon as a cell is left
+    input.addEventListener("input", () => {
+      if (input.classList.contains("invalid")) validateField(input); // NEW: clears the red state as soon as it's fixed
+    });
+    td.appendChild(input);
+    tr.appendChild(td);
+  });
+  const rmTd = document.createElement("td");
+  const rmBtn = document.createElement("button");
+  rmBtn.className = "rm-btn";
+  rmBtn.textContent = "×";
+  rmBtn.title = "Remove day";
+  rmBtn.onclick = () => tr.remove();
+  rmTd.appendChild(rmBtn);
+  tr.appendChild(rmTd);
+  gridBody.appendChild(tr);
+}
+
+document.getElementById("addRow").onclick = () => addRow();
+
+// NEW: adds N blank rows at once instead of clicking "+ Add day" repeatedly.
+document.getElementById("addBulk").onclick = () => {
+  const n = parseInt(document.getElementById("bulkCount").value, 10);
+  if (isNaN(n) || n < 1) return;
+  for (let i = 0; i < n; i++) addRow();
+};
+
+// Pre-fill three blank days to start.
+addRow(); addRow(); addRow();
+
+function readRows() {
+  return Array.from(gridBody.querySelectorAll("tr")).map((tr) => {
+    const row = {};
+    tr.querySelectorAll("input").forEach((inp) => {
+      row[inp.dataset.field] = inp.value.trim();
+    });
+    return row;
+  });
+}
+
+// NEW: checks a single cell and toggles its red "invalid" state accordingly.
+// Blank is always fine (means "not entered that day") — only a value that's
+// present but wrong (non-numeric, negative, or an out-of-range date) is flagged.
+function validateField(input) {
+  const v = input.value.trim();
+  let ok = true;
+  if (v !== "") {
+    const num = Number(v);
+    if (isNaN(num)) {
+      ok = false;
+    } else if (input.dataset.kind === "date") {
+      ok = Number.isInteger(num) && num >= 1 && num <= 31;
+    } else {
+      ok = num >= 0; // amounts: no negatives
+    }
+  }
+  input.classList.toggle("invalid", !ok);
+  return ok;
+}
+
+// NEW: validates the whole form (year/month + every cell in every row) and
+// returns a list of plain-language problems. Empty list = safe to generate.
+function validateAll() {
+  const errors = [];
+
+  const yearInput = document.getElementById("year");
+  const monthInput = document.getElementById("month");
+  const yearOk = /^\d{4}$/.test(yearInput.value.trim()) && Number(yearInput.value) >= 2000 && Number(yearInput.value) <= 2100;
+  const monthOk = Number.isInteger(Number(monthInput.value)) && Number(monthInput.value) >= 1 && Number(monthInput.value) <= 12;
+  yearInput.classList.toggle("invalid", !yearOk);
+  monthInput.classList.toggle("invalid", !monthOk);
+  if (!yearOk) errors.push("Year should be a 4-digit year.");
+  if (!monthOk) errors.push("Month should be a number from 1 to 12.");
+
+  const fieldLabel = { date: "Date", cash_sales: "Cash Sales", pos_scotia: "POS→Scotia", pos_republic: "POS→Republic",
+    pos_unspec: "POS→Unspec.", doctor_fees: "Doctor's Fees", med_supplies: "Med. Supplies", misc: "Misc.",
+    taxi: "Taxi Fare", deposit: "Deposits", related_party: "Related Party" };
+
+  Array.from(gridBody.querySelectorAll("tr")).forEach((tr, rowIdx) => {
+    tr.querySelectorAll("input").forEach((input) => {
+      if (!validateField(input)) {
+        errors.push(`Row ${rowIdx + 1}, ${fieldLabel[input.dataset.field] || input.dataset.field}: "${input.value}" isn't valid.`);
+      }
+    });
+  });
+
+  return errors;
+}
+
+// Builds the section of a day's answers for one category group (cash or expense).
+// Only categories with a nonzero value get entered; "1" = go back to the menu for
+// another category, "2" = move on. "0" is used if nothing in the group was entered.
+function buildSection(row, cols, lines) {
+  const entries = [];
+  cols.forEach((key, i) => {
+    const v = parseFloat(row[key]);
+    if (!isNaN(v) && v > 0) entries.push({ idx: i + 1, val: v });
+  });
+  if (entries.length === 0) {
+    lines.push("0");
+  } else {
+    entries.forEach((e, i) => {
+      lines.push(String(e.idx));
+      lines.push(String(e.val));
+      lines.push(i < entries.length - 1 ? "1" : "2");
+    });
+  }
+}
+
+function buildFile() {
+  const year = document.getElementById("year").value.trim();
+  const month = document.getElementById("month").value.trim();
+  const rows = readRows().filter((r) => r.date !== "");
+
+  const status = document.getElementById("status");
+  if (!year || !month) {
+    status.textContent = "Enter a year and month first.";
+    status.className = "status err";
+    return null;
+  }
+  if (rows.length === 0) {
+    status.textContent = "Add at least one day with a date.";
+    status.className = "status err";
+    return null;
+  }
+
+  const lines = [year, month];
+  rows.forEach((row, i) => {
+    lines.push(row.date);
+    buildSection(row, CASH_COLS, lines);
+    buildSection(row, EXP_COLS, lines);
+    lines.push(String(parseFloat(row.deposit) || 0));
+    lines.push(String(parseFloat(row.related_party) || 0));
+    lines.push(i < rows.length - 1 ? "1" : "2"); // "another day?" — "2" only on the last row
+  });
+
+  status.textContent = `Generated ${rows.length} day(s).`;
+  status.className = "status";
+  return lines.join("\n") + "\n";
+}
+
+document.getElementById("generate").onclick = () => {
+  // NEW: validate everything first — a bad cell blocks the download instead of
+  // silently getting dropped or crashing the Julia side later.
+  const errors = validateAll();
+  const errorList = document.getElementById("errorList");
+  const errorItems = document.getElementById("errorItems");
+  if (errors.length > 0) {
+    errorItems.innerHTML = errors.map((e) => `<li>${e}</li>`).join("");
+    errorList.classList.add("show");
+    document.getElementById("status").textContent = `${errors.length} field(s) need fixing.`;
+    document.getElementById("status").className = "status err";
+    return;
+  }
+  errorList.classList.remove("show");
+
+  const content = buildFile();
+  if (content === null) return;
+
+  document.getElementById("outText").value = content;
+  document.getElementById("outWrap").classList.add("show");
+
+  const blob = new Blob([content], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "ledger_input.txt";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
+// Loads the exact 22-day Scenario G data, so the generated file can be diffed
+// against scenario_g_22day_v2_inputs.txt to confirm this tool matches it exactly.
+document.getElementById("loadTest").onclick = () => {
+  gridBody.innerHTML = "";
+  document.getElementById("year").value = 2026;
+  document.getElementById("month").value = 7;
+  const days = [
+    {date:1, cash_sales:620, doctor_fees:80, deposit:500, related_party:0},
+    {date:2, pos_scotia:950, med_supplies:120, deposit:300, related_party:0},
+    {date:3, cash_sales:430, pos_republic:610, misc:45, deposit:250, related_party:0},
+    {date:4, pos_unspec:380, doctor_fees:150, taxi:25, deposit:0, related_party:0},
+    {date:5, cash_sales:710, deposit:600, related_party:200},
+    {date:6, deposit:0, related_party:0},
+    {date:7, cash_sales:520, pos_scotia:340, doctor_fees:60, med_supplies:90, misc:20, deposit:400, related_party:0},
+    {date:8, pos_republic:290, taxi:15, deposit:290, related_party:0},
+    {date:9, cash_sales:880, doctor_fees:200, deposit:680, related_party:0},
+    {date:10, pos_unspec:470, med_supplies:60, misc:30, deposit:470, related_party:150},
+    {date:11, cash_sales:360, deposit:360, related_party:0},
+    {date:12, pos_scotia:610, doctor_fees:100, taxi:20, deposit:500, related_party:0},
+    {date:13, cash_sales:290, pos_republic:180, med_supplies:40, deposit:250, related_party:0},
+    {date:14, misc:25, deposit:0, related_party:0},
+    {date:15, cash_sales:640, deposit:640, related_party:0},
+    {date:16, pos_unspec:520, doctor_fees:70, deposit:520, related_party:0},
+    {date:17, cash_sales:410, pos_scotia:200, deposit:400, related_party:0},
+    {date:18, deposit:150, related_party:0},
+    {date:19, cash_sales:560, taxi:35, deposit:560, related_party:0},
+    {date:20, pos_republic:460, doctor_fees:90, deposit:460, related_party:100},
+    {date:21, cash_sales:320, deposit:320, related_party:0},
+    {date:22, pos_unspec:610, med_supplies:110, deposit:610, related_party:0},
+  ];
+  days.forEach((d) => addRow(d));
+  document.getElementById("status").textContent = "Scenario G loaded — click Generate to verify against scenario_g_22day_v2_inputs.txt";
+  document.getElementById("status").className = "status";
+};
+</script>
+</body>
+</html>
