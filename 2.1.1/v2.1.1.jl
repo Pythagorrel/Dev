@@ -74,9 +74,9 @@ function csv1()
 
             println("\nEnter 0 if there were no sales on this day. This will take you to the next section.")
 
-            c1 = parse(Int, readline())  
+            c1 = (readline())  
 
-            if c1==0
+            if c1 == "0"
                 pending = false
             else
 
@@ -88,9 +88,9 @@ function csv1()
                 println("\nAmount: \$$(daily_cash_eq[cash_eq_in[c1].key][day_no]) stored. Enter 1 to return to the Cash Or Cash Equivalent Sales Category Menu.
                 \nOtherwise, enter any other key to proceed to the next section.")
 
-                c2 = parse(Int, readline())
+                c2 = (readline())
 
-                if c2!=1
+                if c2!="1"
                     pending = false
                 end
 
@@ -112,8 +112,8 @@ function csv1()
 
             println("\nEnter 0 if there were no expenses on this day. This will take you to the next section.")
 
-            c3 = parse(Int, readline())  
-            if c3==0
+            c3 = (readline())  
+            if c3=="0"
                 pending1 = false
             else
 
@@ -126,9 +126,9 @@ function csv1()
                 println("\nAmount: \$$(daily_expense[expense[c3].key][day_no]) stored. Enter 1 to return to the Expense Category Menu.
                 \nOtherwise, enter any other key to proceed to the next section.")
 
-                c4 = parse(Int, readline())
+                c4 = (readline())
 
-                if c4!=1
+                if c4!="1"
                     pending1 = false
                 end 
 
@@ -144,7 +144,7 @@ function csv1()
         daily_rp[related_party[1].key][day_no] = parse(Float64, readline())  # FIXED: same fix as deposit above — related_party[1], not related_party[c1]
 
         println("If you have another day's balance sheet to record, enter 1.
-        \nEnter 2 to generate the current spreadsheet.")
+        \nEnter any other key to generate the current spreadsheet.")
 
         c5 = readline()
 
