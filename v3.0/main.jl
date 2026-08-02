@@ -35,15 +35,25 @@ include("DayInput.jl"); using .DayInput
 include("Journal.jl");  using .Journal
 include("Ledger.jl");   using .Ledger
 
-function main(args::Vector{String}=ARGS)
-    force = "--force" in args        # explicit opt-in to overwrite a daily ledger
+"""
+    process_day(rec; force=false, echo=true)
 
-    # --- 1. one day of input ------------------------------------------------
-    rec = DayInput.read_day(args)
+Steps 2 to 8 for one day, callable from anywhere.
+
+WHY THIS WAS SPLIT OUT OF main(): the web server needs to run exactly the same
+pipeline, and the only alternative would have been for the server to re-implement
+these steps — which is precisely how two code paths drift apart. main() is now
+just "get a day, hand it to process_day"; the server is "get a day, hand it to
+process_day". One pipeline, two front doors.
+
+Returns a NamedTuple describing what happened, so a caller that has no terminal
+(i.e. the server) can report it to the user some other way.
+"""
+function process_day(rec::DayRecord; force::Bool=false, echo::Bool=true)
     y, m, d = year(rec.date), month(rec.date), day(rec.date)
 
     session = AuditSession(joinpath(Layout.ROOT, "audit_log.txt"))
-    println("\nProcessing $(rec.date)...")
+    echo && println("\nProcessing $(rec.date)...")
 
     # --- 2. year / month folders -------------------------------------------
     mdir, mdir_created = ensure_month_dir(y, m)
@@ -81,12 +91,14 @@ function main(args::Vector{String}=ARGS)
         @warn "A daily ledger already exists for $(rec.date):\n  $dlpath\n" *
               "It has NOT been overwritten. Re-run with --force if that is what you want."
         log_event(session, "REFUSED to overwrite existing daily ledger $(basename(dlpath))")
+        daily_ledger_status = "skipped"
     else
         overwriting = isfile(dlpath)
         write_ledger_csv(day_cash, day_expense, day_deposit, day_rp, dlpath)
         log_event(session, overwriting ?
             "OVERWROTE daily ledger $(basename(dlpath)) (--force)" :
             "wrote daily ledger $(basename(dlpath))")
+        daily_ledger_status = overwriting ? "overwritten" : "written"
     end
 
     # --- 7. the monthly ledger, rebuilt from the journal --------------------
@@ -102,11 +114,30 @@ function main(args::Vector{String}=ARGS)
         "rebuilt monthly ledger from journal ($(nrow(df)) day(s))" :
         "created monthly ledger from journal ($(nrow(df)) day(s))")
 
-    # --- 8. summary + audit -------------------------------------------------
-    print_day_summary(rec)
+    # --- 8. audit ------------------------------------------------------------
     log_entry(session; header="day $(rec.date)")
 
-    println("\nDone. Files under: $mdir")
+    return (date            = rec.date,
+            journal         = replaced ? "replaced" : "added",
+            daily_ledger    = daily_ledger_status,
+            monthly_ledger  = monthly_existed ? "rebuilt" : "created",
+            days_in_month   = nrow(df),
+            output_dir      = mdir,
+            events          = copy(session.events))
+end
+
+"""
+    main(args)
+
+The command-line front door. Unchanged in behaviour from before the server was
+added: read one day, process it, print a summary.
+"""
+function main(args::Vector{String}=ARGS)
+    force = "--force" in args        # explicit opt-in to overwrite a daily ledger
+    rec = DayInput.read_day(args)    # file if a path was given, prompts if not
+    result = process_day(rec; force=force)
+    print_day_summary(rec)
+    println("\nDone. Files under: $(result.output_dir)")
     return nothing
 end
 
