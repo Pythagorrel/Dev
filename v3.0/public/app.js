@@ -310,7 +310,7 @@ function nextDate(iso) {
   const d = new Date(iso + "T00:00:00");
   d.setDate(d.getDate() + 1);
   const next = d.toISOString().slice(0, 10);
-  return next > state.today ? iso : next;   // never roll past today
+  // return next > state.today ? iso : next;   // never roll past today
 }
 
 async function onNextDay() {

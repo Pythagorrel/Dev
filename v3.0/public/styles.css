@@ -80,7 +80,7 @@ body {
   position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
   font-size: 13px; color: var(--ink-soft); pointer-events: none;
 }
-.money input { padding-left: 26px; }
+.money input { padding-left: 26px; text-align: right; }
 
 input[type=text], select {
   width: 100%; padding: 9px 11px; font-size: 14px; font-family: inherit; color: var(--ink);

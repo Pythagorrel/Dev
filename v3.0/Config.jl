@@ -23,7 +23,7 @@ const cash_eq_in = [(key=:cash_sales, label="Cash Sales", account="Cash & Cash E
     (key=:POS_RBL, label="POS Deposits to Republic Bank", account="Cash & Cash Equivalent:RBL - CHQ-13739"),
     (key=:POS_U, label="POS Deposits To Unspecified Bank", account="Cash & Cash Equivalent:POS Unidentified Urgent Care")]
 
-const expense = [(key=:doctor_fees, label="Doctor's Fees", account="Cost of sales:Sub-contractor - COS"),
+const expense = [(key=:doctor_fees, label="Doctor's Fees", account="Cost of sales:Sub-contractor- COS"),
     (key=:medical_supply_costs, label="Medical Supplies", account="Cost of sales:Purchases-COS"),
     (key=:miscellaneous_costs, label="Miscellaneous Items", account="Cost of sales:Purchases-COS"),
     (key=:taxi_fare, label="Taxi Fare", account="Local Transportation")]
