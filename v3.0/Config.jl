@@ -26,7 +26,7 @@ const cash_eq_in = [(key=:cash_sales, label="Cash Sales", account="Cash & Cash E
 const expense = [(key=:doctor_fees, label="Doctor's Fees", account="Cost of sales:Sub-contractor-  COS"),
     (key=:medical_supply_costs, label="Medical Supplies", account="Cost of sales:Purchases-COS"),
     (key=:miscellaneous_costs, label="Miscellaneous Items", account="Cost of sales:Purchases-COS"),
-    (key=:taxi_fare, label="Taxi Fare", account="Local Transportation")]
+    (key=:taxi_fare, label="Taxi Fare", account="Local Travel")]
 
 const deposit = [(key=:deposits, label="Deposits", account="Undeposited Funds Urgent Care")]
 
