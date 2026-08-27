@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<!--
+  index.html — the shell.
+
+  Note what is NOT in this file: no category names, no account names, no
+  accounting rules of any kind. The category cards and their fields are built
+  at runtime from whatever /api/config reports, which is generated from
+  Config.jl. Add a category there and it appears here on the next reload,
+  with no edit to this file.
+
+  This page's entire job is to produce one day's figures and hand them to the
+  server. It has no idea what a ledger is.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Entry — Bookkeeping</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#1F6F5C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/>
+      <path d="M15 4v5h5"/><path d="M8 13h8"/><path d="M8 17h5"/>
+    </svg>
+    <h1>Daily Entry</h1>
+  </div>
+
+  <div class="stepper">
+    <div class="step active" id="step-1">1 · Enter days</div>
+    <div class="step-sep">—</div>
+    <div class="step" id="step-2">2 · Review</div>
+    <div class="step-sep">—</div>
+    <div class="step" id="step-3">3 · Saved</div>
+  </div>
+
+  <!-- ================= ENTRY ================= -->
+  <section id="view-entry">
+    <div class="band">
+      <h2>Record one day</h2>
+      <p>Leave anything that did not happen blank — blank counts as zero.</p>
+    </div>
+
+    <div id="banner-area"></div>
+
+    <div class="card">
+      <h3>Date of entry</h3>
+      <p class="hint">Which day's takings are these?</p>
+      <div class="date-row">
+        <div class="field">
+          <label for="sel-month">Month</label>
+          <select id="sel-month"></select>
+        </div>
+        <div class="field">
+          <label for="sel-day">Day</label>
+          <select id="sel-day"></select>
+        </div>
+        <div class="field">
+          <label for="sel-year">Year</label>
+          <select id="sel-year"></select>
+        </div>
+      </div>
+      <div class="err" id="err-date"></div>
+    </div>
+
+    <!-- category cards are inserted here by app.js -->
+    <!-- v4.0: closed-day switch. Marking a day closed is ONE CLICK while
+         entering a trading day is a whole form, and that asymmetry points the
+         wrong way — a trading day wrongly marked closed erases its takings.
+         The confirmation in app.js is the only thing standing in the way
+         (Warnings Guide L3-C). -->
+    <div class="closedline">
+      <label><input type="checkbox" id="chk-closed"> This day was <b>closed</b> — no trading</label>
+      <span class="muted" id="closed-note"></span>
+    </div>
+
+    <!-- v4.0: what the previous day closed at. SHOWN, NEVER PRE-FILLED. Putting
+         it in the box would make the overnight check compare a number against
+         itself and pass every time (Warnings Guide §8). -->
+    <div id="prior-hint" class="hintline" hidden></div>
+
+    <div id="groups"></div>
+
+    <!-- v4.0: live predicted closing balance, displayed beside the counted one
+         so a difference is visible while the operator is still at the drawer. -->
+    <div id="predicted" class="hintline" hidden></div>
+
+    <!-- v4.0: the warning panel. Rendered entirely from what the server says —
+         the browser never decides a severity for itself. -->
+    <div id="findings"></div>
+
+    <!-- v4.0: the typed reason for a Level 2 difference. This is the entire
+         value of the warning: a week later "miscounted the 500 notes" and "no
+         idea" lead to very different conversations. -->
+    <div id="reason-box" class="reasonbox" hidden>
+      <label for="txt-reason"><b>This day does not balance.</b> Please say briefly why before saving.</label>
+      <input type="text" id="txt-reason" maxlength="200"
+             placeholder="e.g. Miscounted at close, or: could not locate">
+      <div class="muted">&ldquo;Could not locate&rdquo; is a perfectly good answer. Never change a figure to make the day balance.</div>
+    </div>
+
+    <div class="totals">
+      <div>Takings<b id="tot-cash">$0.00</b></div>
+      <div>Expenses<b id="tot-exp">$0.00</b></div>
+      <div>Banked<b id="tot-dep">$0.00</b></div>
+      <div>Days saved this session<b id="tot-staged">0</b></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-quiet" id="btn-clear" type="button">Clear this day</button>
+      <button class="btn-ghost"  id="btn-cancel-edit" type="button" hidden>Cancel edit</button>
+      <button class="btn-ghost"  id="btn-review" type="button">Review &amp; save&nbsp;→</button>
+      <button class="btn-primary" id="btn-next" type="button">Save &amp; next day</button>
+    </div>
+  </section>
+
+  <!-- ================= REVIEW ================= -->
+  <section id="view-review" class="hidden">
+    <div class="band">
+      <h2>Check before saving</h2>
+      <p>Nothing has been written to the books yet. Edit anything that looks wrong.</p>
+    </div>
+
+    <div id="review-banner"></div>
+    <div class="table-scroll"><table id="review-table"></table></div>
+
+    <!-- v4.0: the first day ever has no previous day to check against, so its
+         opening balance is accepted on trust once, deliberately, and the
+         authorisation is recorded in the audit log. -->
+    <div class="checkline" id="genesis-line" hidden>
+      <input type="checkbox" id="chk-genesis">
+      <label for="chk-genesis">This is the <b>first day on record</b>. Accept its opening balance as the starting point.</label>
+    </div>
+
+    <div class="checkline" id="force-line" hidden>
+      <input type="checkbox" id="chk-force">
+      <label for="chk-force">
+        Overwrite daily ledger files that already exist.
+        <span class="muted">Leave this unticked and those days will still update the journal and the monthly ledger — only the existing daily ledger file is left alone.</span>
+      </label>
+    </div>
+
+    <div class="actions">
+      <button class="btn-quiet"   id="btn-back" type="button">←&nbsp;Add another day</button>
+      <button class="btn-primary" id="btn-commit" type="button">Generate ledgers &amp; update journal</button>
+    </div>
+  </section>
+
+  <!-- ================= DONE ================= -->
+  <section id="view-done" class="hidden">
+    <div class="band">
+      <h2 id="done-title">Saved</h2>
+      <p id="done-sub"></p>
+    </div>
+    <div id="done-list"></div>
+    <div class="actions">
+      <button class="btn-primary" id="btn-restart" type="button">Enter more days</button>
+    </div>
+  </section>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>
