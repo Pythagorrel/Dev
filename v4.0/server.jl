@@ -339,9 +339,15 @@ function handle_check(req)
         return fail(400, e isa ArgumentError ? e.msg : "That day could not be read.")
     end
     fs = findings_json(rec)
+
+    predicted = is_closed(rec) ? nothing : Checks.predicted_closing(rec)
+    
+    # Convert NaN to nothing so JSON3 serializes it as null
+    safe_predicted = (predicted isa Number && !isfinite(predicted)) ? nothing : predicted
+    
     return json(200, (ok = true,
                       findings = fs,
-                      predicted = is_closed(rec) ? nothing : Checks.predicted_closing(rec),
+                      predicted = safe_predicted,
                       needsReason = any(f -> f.level == Checks.LEVEL_EXPLAIN, fs),
                       blocked = any(f -> f.level == Checks.LEVEL_STOP, fs)))
 end
