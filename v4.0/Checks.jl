@@ -463,26 +463,36 @@ function check_day(rec::DayRecord;
     # caller records that authorisation in the audit log. Without this the
     # gating rule below would hold the very first ledger forever and nothing
     # would ever post.
-    if is_genesis
-        push!(findings, Finding("L3-D", LEVEL_NOTICE, :opening_balance,
-            "This is the first day on record, so there is nothing to check the opening " *
-            "balance against. It will be accepted as the starting point for every day " *
-            "that follows.", nothing))
-
-    # --- L3-A: ledger held, waiting on the previous day --------------------
-    # NOT an objection to a gap and NOT a calendar check — the program has no
-    # idea which days it "should" have. The overnight difference is part of
-    # this day's ledger, so without the previous day that ledger genuinely
-    # cannot be finished. Arithmetic waiting on an input, nothing more.
     #
-    # Blast radius is exactly one day: the gate needs the previous day's
-    # JOURNAL ROW, not its ledger. So a hole holds up the day after it and
-    # nothing else — the rest of the month posts normally.
-    elseif prior_closing === nothing && !is_closed(rec)
-        push!(findings, Finding("L3-A", LEVEL_NOTICE, nothing,
-            "The day before this one has not been entered yet, so this day's ledger " *
-            "cannot be finished. The day itself is saved. The ledger will be produced " *
-            "automatically once the missing day is entered.", nothing))
+    # GATED ON NO STOP. When a Stop has fired the day is refused outright, so
+    # "the day itself is saved" (L3-A) or "accepted as the starting point"
+    # (L3-D) would be false — the day was NOT saved. Showing both side by
+    # side would tell the operator two contradictory things. The Stop already
+    # explains why the day is blocked; the notice will appear cleanly on the
+    # next attempt once the blocking problem is corrected.
+    if !has_stops(findings)
+        if is_genesis
+            push!(findings, Finding("L3-D", LEVEL_NOTICE, :opening_balance,
+                "This is the first day on record, so there is nothing to check the opening " *
+                "balance against. It will be accepted as the starting point for every day " *
+                "that follows.", nothing))
+
+        # --- L3-A: ledger held, waiting on the previous day ----------------
+        # NOT an objection to a gap and NOT a calendar check — the program has
+        # no idea which days it "should" have. The overnight difference is part
+        # of this day's ledger, so without the previous day that ledger
+        # genuinely cannot be finished. Arithmetic waiting on an input,
+        # nothing more.
+        #
+        # Blast radius is exactly one day: the gate needs the previous day's
+        # JOURNAL ROW, not its ledger. So a hole holds up the day after it and
+        # nothing else — the rest of the month posts normally.
+        elseif prior_closing === nothing && !is_closed(rec)
+            push!(findings, Finding("L3-A", LEVEL_NOTICE, nothing,
+                "The day before this one has not been entered yet, so this day's ledger " *
+                "cannot be finished. The day itself is saved. The ledger will be produced " *
+                "automatically once the missing day is entered.", nothing))
+        end
     end
 
     # --- L3-B: a ledger already exists for this date ------------------------
