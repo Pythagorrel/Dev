@@ -298,8 +298,32 @@ function _retry_pending!(session, y::Integer, m::Integer, force::Bool, echo::Boo
             ready, _, _ = Chain.ledger_ready(prec)
             ready || continue
 
+            # --- Recompute variances against the now-available prior day ----
+            # The values stored in the journal were computed at first entry,
+            # when the prior day did not exist yet — so overnight_variance was
+            # computed against `nothing` and stored as 0.0. Now the gap is
+            # filled and the real prior closing is known; replaying the stale
+            # zero would silently hide a genuine overnight movement.
+            prior = Chain.prior_day(pend)
+            new_dv = is_closed(prec) ? 0.0 : Checks.day_residual(prec)
+            new_ov = is_closed(prec) ? 0.0 : Checks.overnight_variance(prec, prior === nothing ? nothing : prior.closing)
+
+            if abs(new_ov - amounts[:overnight_variance]) >= 0.005 ||
+               abs(new_dv - amounts[:day_variance]) >= 0.005
+                # Update the journal row so the source of truth carries the
+                # corrected figures. The monthly rebuild at step 6 re-reads
+                # the journal, so it will pick these up automatically.
+                amounts[:overnight_variance] = new_ov
+                amounts[:day_variance]       = new_dv
+                prec.amounts[:overnight_variance] = new_ov
+                prec.amounts[:day_variance]       = new_dv
+                jdf, _ = upsert_day!(jdf, prec)
+                write_journal(jp, jdf)
+                log_event(session, "RECOMPUTED variances for $pend — overnight $(round(new_ov, digits=2)), day $(round(new_dv, digits=2))"; echo=echo)
+            end
+
             st = _write_daily_ledger!(session, prec,
-                                      amounts[:day_variance], amounts[:overnight_variance],
+                                      new_dv, new_ov,
                                       true, force, echo)
             if st in ("written", "overwritten")
                 push!(released, pend)
